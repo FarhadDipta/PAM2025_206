@@ -4,11 +4,14 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.spms.data.model.Patient
 import com.example.spms.data.repository.PatientRepository
 import com.example.spms.ui.components.GenderDropdown
 import com.example.spms.ui.components.PreviewDialog
+import com.example.spms.ui.components.SuccessDialog
 import com.example.spms.utils.Validators
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -22,6 +25,7 @@ fun PatientFormScreen(
     initialPatient: Patient? = null
 ) {
     val isUpdate = initialPatient != null
+    var isSubmitting by remember { mutableStateOf(false) }
 
     var name by remember { mutableStateOf(initialPatient?.name ?: "") }
     var nik by remember { mutableStateOf(initialPatient?.nik ?: "") }
@@ -33,19 +37,17 @@ fun PatientFormScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(false) }
 
-    val snackbarHostState = remember { SnackbarHostState() }
+    var showSuccessDialog by remember { mutableStateOf(false) }
+    var successMessage by remember { mutableStateOf("") }
 
     val isFormFilled = name.isNotBlank() && nik.isNotBlank() && gender.isNotBlank() &&
             phone.isNotBlank() && guardian.isNotBlank()
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(if (isUpdate) "Update Pasien" else "Tambah Pasien") },
-                navigationIcon = {
-                    TextButton(onClick = onBack) { Text("Back") }
-                }
+                navigationIcon = { TextButton(onClick = onBack) { Text("Back") } }
             )
         }
     ) { padding ->
@@ -59,16 +61,26 @@ fun PatientFormScreen(
 
             OutlinedTextField(
                 value = name,
-                onValueChange = { name = it },
+                onValueChange = { name = it.replace("\n", "") },
                 label = { Text("Nama") },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                maxLines = 1,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Text
+                )
             )
 
             OutlinedTextField(
                 value = nik,
-                onValueChange = { nik = it },
+                onValueChange = { nik = it.replace("\n", "") },
                 label = { Text("NIK / Nomor Identitas") },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                maxLines = 1,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Number
+                )
             )
 
             GenderDropdown(
@@ -79,16 +91,26 @@ fun PatientFormScreen(
 
             OutlinedTextField(
                 value = phone,
-                onValueChange = { phone = it },
+                onValueChange = { phone = it.replace("\n", "") },
                 label = { Text("No HP (Pasien/Wali)") },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                maxLines = 1,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Phone
+                )
             )
 
             OutlinedTextField(
                 value = guardian,
-                onValueChange = { guardian = it },
+                onValueChange = { guardian = it.replace("\n", "") },
                 label = { Text("Nama Orang Tua / Wali") },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                maxLines = 1,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Text
+                )
             )
 
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
@@ -97,23 +119,24 @@ fun PatientFormScreen(
 
             Button(
                 onClick = {
+                    if (isSubmitting) return@Button
                     error = null
 
                     if (!Validators.isValidNik(nik.trim())) {
-                        error = "data NIK salah, perbaiki dengan memasukan 16 digit angka"
+                        error = "Format NIK salah (16 digit angka)"
                         return@Button
                     }
                     if (!Validators.isValidPhone(phone.trim())) {
-                        error = "data No HP salah, perbaiki dengan format 08xxxxxxxxxx (10-13 digit)"
+                        error = "Format No HP salah (08xxxx, 10-13 digit)"
                         return@Button
                     }
 
                     showPreview = true
                 },
-                enabled = isFormFilled && !loading,
+                enabled = isFormFilled && !loading && !isSubmitting,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Lanjut Preview")
+                Text(if (isSubmitting) "Memproses..." else "Lanjut Preview")
             }
         }
     }
@@ -132,14 +155,12 @@ fun PatientFormScreen(
         PreviewDialog(
             title = "Preview Data Pasien",
             contentText = previewText,
-            onCancel = {
-                showPreview = false
-                CoroutineScope(Dispatchers.Main).launch {
-                    snackbarHostState.showSnackbar("data tidak berhasil ${if (isUpdate) "diupdate" else "ditambahkan"}")
-                }
-            },
+            onCancel = { showPreview = false },
             onSubmit = {
+                isSubmitting = true
                 loading = true
+                showPreview = false
+
                 CoroutineScope(Dispatchers.Main).launch {
                     try {
                         if (isUpdate) {
@@ -154,7 +175,7 @@ fun PatientFormScreen(
                                     createdAt = initialPatient.createdAt
                                 )
                             )
-                            snackbarHostState.showSnackbar("data berhasil diupdate")
+                            successMessage = "Data berhasil diupdate"
                         } else {
                             patientRepo.createPatient(
                                 Patient(
@@ -165,19 +186,29 @@ fun PatientFormScreen(
                                     guardianName = guardian.trim()
                                 )
                             )
-                            snackbarHostState.showSnackbar("data berhasil ditambahkan")
+                            successMessage = "Data berhasil ditambahkan"
                         }
 
-                        showPreview = false
                         loading = false
-                        onBack()
-
+                        isSubmitting = false
+                        showSuccessDialog = true
                     } catch (e: Exception) {
                         loading = false
-                        showPreview = false
-                        snackbarHostState.showSnackbar(e.message ?: "gagal menyimpan data")
+                        isSubmitting = false
+                        error = e.message ?: "Gagal menyimpan data"
                     }
                 }
+            },
+            isSubmitting = isSubmitting
+        )
+    }
+
+    if (showSuccessDialog) {
+        SuccessDialog(
+            message = successMessage,
+            onDismiss = {
+                showSuccessDialog = false
+                onBack()
             }
         )
     }

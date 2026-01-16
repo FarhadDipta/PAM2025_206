@@ -9,19 +9,20 @@ fun PreviewDialog(
     title: String,
     contentText: String,
     onCancel: () -> Unit,
-    onSubmit: () -> Unit
+    onSubmit: () -> Unit,
+    isSubmitting: Boolean
 ) {
     AlertDialog(
         onDismissRequest = onCancel,
         title = { Text(title) },
         text = { Text(contentText) },
         confirmButton = {
-            Button(onClick = onSubmit) {
-                Text("Submit")
+            Button(onClick = onSubmit, enabled = !isSubmitting) {
+                Text(if (isSubmitting) "Memproses..." else "Submit")
             }
         },
         dismissButton = {
-            OutlinedButton(onClick = onCancel) {
+            OutlinedButton(onClick = onCancel, enabled = !isSubmitting) {
                 Text("Cancel")
             }
         }

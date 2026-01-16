@@ -5,7 +5,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -20,18 +20,18 @@ fun AdminDashboardScreen(
     onGoPatients: () -> Unit,
     onLogout: () -> Unit
 ) {
+    var showLogoutDialog by remember { mutableStateOf(false) }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            // Topbar custom: logout di kiri atas
             CenterAlignedTopAppBar(
                 title = {},
                 navigationIcon = {
-                    TextButton(onClick = onLogout) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Logout"
-                        )
+                    TextButton(
+                        onClick = { showLogoutDialog = true } // ✅ buka dialog dulu
+                    ) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Logout")
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(text = "Logout")
                     }
@@ -50,8 +50,6 @@ fun AdminDashboardScreen(
                 .padding(horizontal = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-
-            // kasih jarak biar judul turun ke bawah rapih
             Spacer(modifier = Modifier.height(22.dp))
 
             Text(
@@ -67,22 +65,14 @@ fun AdminDashboardScreen(
 
             Spacer(modifier = Modifier.height(26.dp))
 
-            // tombol di tengah seperti TextField login (tidak full layar)
-            val buttonWidth = 0.95f
-
             Button(
                 onClick = onGoNurses,
                 modifier = Modifier
-                    .fillMaxWidth(buttonWidth)
+                    .fillMaxWidth(0.95f)
                     .height(52.dp),
                 shape = RoundedCornerShape(18.dp)
             ) {
-                Text(
-                    text = "Data Perawat",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.SemiBold
-                    )
-                )
+                Text("Data Perawat")
             }
 
             Spacer(modifier = Modifier.height(14.dp))
@@ -90,17 +80,39 @@ fun AdminDashboardScreen(
             Button(
                 onClick = onGoPatients,
                 modifier = Modifier
-                    .fillMaxWidth(buttonWidth)
+                    .fillMaxWidth(0.95f)
                     .height(52.dp),
                 shape = RoundedCornerShape(18.dp)
             ) {
-                Text(
-                    text = "Data Pasien",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.SemiBold
-                    )
-                )
+                Text("Data Pasien")
             }
         }
+    }
+
+    // ✅ Dialog Konfirmasi Logout
+    if (showLogoutDialog) {
+        AlertDialog(
+            onDismissRequest = { showLogoutDialog = false },
+            title = { Text("Konfirmasi") },
+            text = { Text("Apakah ingin logout?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showLogoutDialog = false
+                        onLogout()
+                    }
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { showLogoutDialog = false }
+                ) {
+                    Text("Cancel")
+                }
+            },
+            shape = RoundedCornerShape(18.dp)
+        )
     }
 }

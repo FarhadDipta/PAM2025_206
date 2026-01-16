@@ -1,6 +1,7 @@
 package com.example.spms.ui.components
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -38,7 +39,10 @@ fun GenderDropdown(
             modifier = Modifier
                 .menuAnchor()
                 .fillMaxWidth()
-                .clickable { expanded = true }
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) { expanded = true }
         )
 
         ExposedDropdownMenu(
