@@ -11,6 +11,7 @@ import com.example.spms.data.model.Nurse
 import com.example.spms.data.repository.NurseRepository
 import com.example.spms.ui.components.GenderDropdown
 import com.example.spms.ui.components.PreviewDialog
+import com.example.spms.ui.components.SuccessDialog
 import com.example.spms.utils.Validators
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -33,21 +34,22 @@ fun NurseFormScreen(
     var email by remember { mutableStateOf(initialNurse?.email ?: "") }
     var address by remember { mutableStateOf(initialNurse?.address ?: "") }
 
-    // Password hanya untuk CREATE (admin input password perawat)
+    // Password hanya untuk CREATE
     var password by remember { mutableStateOf("") }
 
     var showPreview by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(false) }
 
-    val snackbarHostState = remember { SnackbarHostState() }
+    // ✅ SuccessDialog (centang)
+    var showSuccessDialog by remember { mutableStateOf(false) }
+    var successMessage by remember { mutableStateOf("") }
 
     val isFormFilled = name.isNotBlank() && nip.isNotBlank() && gender.isNotBlank() &&
             phone.isNotBlank() && email.isNotBlank() && address.isNotBlank() &&
             (isUpdate || password.isNotBlank())
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(if (isUpdate) "Update Perawat" else "Tambah Perawat") },
@@ -63,7 +65,6 @@ fun NurseFormScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
 
-            // Nama (tidak bisa enter)
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it.replace("\n", "") },
@@ -71,12 +72,9 @@ fun NurseFormScreen(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 maxLines = 1,
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Text
-                )
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text)
             )
 
-            // NIP / STR / SIP (huruf + angka)
             OutlinedTextField(
                 value = nip,
                 onValueChange = { nip = it.replace("\n", "") },
@@ -84,9 +82,7 @@ fun NurseFormScreen(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 maxLines = 1,
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Text
-                )
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text)
             )
 
             GenderDropdown(
@@ -95,7 +91,6 @@ fun NurseFormScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            // No HP (angka)
             OutlinedTextField(
                 value = phone,
                 onValueChange = { phone = it.replace("\n", "") },
@@ -103,12 +98,9 @@ fun NurseFormScreen(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 maxLines = 1,
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Phone
-                )
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone)
             )
 
-            // Email (keyboard email)
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it.replace("\n", "") },
@@ -116,12 +108,10 @@ fun NurseFormScreen(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 maxLines = 1,
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Email
-                )
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
             )
 
-            // Alamat (boleh enter)
+            // Alamat boleh enter
             OutlinedTextField(
                 value = address,
                 onValueChange = { address = it },
@@ -129,12 +119,10 @@ fun NurseFormScreen(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = false,
                 maxLines = 4,
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Text
-                )
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text)
             )
 
-            // Password hanya saat create (tidak bisa enter)
+            // Password hanya saat create
             if (!isUpdate) {
                 OutlinedTextField(
                     value = password,
@@ -143,9 +131,7 @@ fun NurseFormScreen(
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     maxLines = 1,
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Password
-                    )
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
                 )
             }
 
@@ -181,6 +167,9 @@ fun NurseFormScreen(
         }
     }
 
+    // ======================
+    // PREVIEW DIALOG
+    // ======================
     if (showPreview) {
         val previewText = """
             Data yang ingin ${if (isUpdate) "diupdate" else "ditambahkan"}:
@@ -198,13 +187,11 @@ fun NurseFormScreen(
             contentText = previewText,
             onCancel = {
                 showPreview = false
-                CoroutineScope(Dispatchers.Main).launch {
-                    snackbarHostState.showSnackbar("data tidak berhasil ${if (isUpdate) "diupdate" else "ditambahkan"}")
-                }
             },
             onSubmit = {
                 isSubmitting = true
                 loading = true
+
                 CoroutineScope(Dispatchers.Main).launch {
                     try {
                         if (isUpdate) {
@@ -220,7 +207,7 @@ fun NurseFormScreen(
                                     createdAt = initialNurse.createdAt
                                 )
                             )
-                            snackbarHostState.showSnackbar("data berhasil diupdate")
+                            successMessage = "Data berhasil diupdate"
                         } else {
                             nurseRepo.createNurse(
                                 Nurse(
@@ -233,23 +220,38 @@ fun NurseFormScreen(
                                 ),
                                 passwordPlain = password.trim()
                             )
-                            snackbarHostState.showSnackbar("data berhasil ditambahkan")
+                            successMessage = "Data berhasil ditambahkan"
                         }
 
                         showPreview = false
                         loading = false
                         isSubmitting = false
-                        onBack()
+
+                        // ✅ tampilkan centang sukses
+                        showSuccessDialog = true
 
                     } catch (e: Exception) {
                         loading = false
                         isSubmitting = false
                         showPreview = false
-                        snackbarHostState.showSnackbar(e.message ?: "gagal menyimpan data")
+                        error = e.message ?: "gagal menyimpan data"
                     }
                 }
             },
             isSubmitting = isSubmitting
+        )
+    }
+
+    // ======================
+    // SUCCESS DIALOG (CENTANG)
+    // ======================
+    if (showSuccessDialog) {
+        SuccessDialog(
+            message = successMessage,
+            onDismiss = {
+                showSuccessDialog = false
+                onBack()
+            }
         )
     }
 }

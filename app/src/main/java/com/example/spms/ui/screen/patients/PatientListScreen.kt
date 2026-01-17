@@ -7,6 +7,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,7 +19,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.spms.data.model.Patient
 import com.example.spms.ui.components.InfoDialog
-import com.example.spms.ui.components.SuccessDialog
+
+private enum class PatientSortOption(val label: String) {
+    NAME_ASC("Nama (A-Z)"),
+    NAME_DESC("Nama (Z-A)"),
+    CODE_ASC("Kode (A-Z)"),
+    CODE_DESC("Kode (Z-A)"),
+    NEWEST("Terbaru"),
+    OLDEST("Terlama")
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -26,16 +36,50 @@ fun PatientListScreen(
     onBack: () -> Unit,
     onCreate: () -> Unit,
     onUpdate: (Patient) -> Unit,
-    onDelete: (Patient) -> Unit
+    onDelete: (Patient, (Boolean, String) -> Unit) -> Unit
 ) {
     var selectedPatient by remember { mutableStateOf<Patient?>(null) }
 
-    var showDetailDialog by remember { mutableStateOf(false) }
+    var showPreviewDialog by remember { mutableStateOf(false) }
     var showUpdateDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
 
-    var showSuccessDialog by remember { mutableStateOf(false) }
-    var successMessage by remember { mutableStateOf("") }
+    // Search
+    var searchQuery by remember { mutableStateOf("") }
+
+    // Sort
+    var sortExpanded by remember { mutableStateOf(false) }
+    var sortOption by remember { mutableStateOf(PatientSortOption.NEWEST) }
+
+    // FILTER
+    val filteredPatients = remember(patients, searchQuery) {
+        if (searchQuery.isBlank()) patients
+        else {
+            val q = searchQuery.trim().lowercase()
+            patients.filter { p ->
+                p.name.lowercase().contains(q) ||
+                        p.code.lowercase().contains(q) ||
+                        p.nik.lowercase().contains(q) ||
+                        p.phone.lowercase().contains(q) ||
+                        p.guardianName.lowercase().contains(q) ||
+                        p.gender.lowercase().contains(q)
+            }
+        }
+    }
+
+    // SORT
+    val finalPatients = remember(filteredPatients, sortOption) {
+        when (sortOption) {
+            PatientSortOption.NAME_ASC -> filteredPatients.sortedBy { it.name.lowercase() }
+            PatientSortOption.NAME_DESC -> filteredPatients.sortedByDescending { it.name.lowercase() }
+
+            PatientSortOption.CODE_ASC -> filteredPatients.sortedBy { it.code.lowercase() }
+            PatientSortOption.CODE_DESC -> filteredPatients.sortedByDescending { it.code.lowercase() }
+
+            PatientSortOption.NEWEST -> filteredPatients.sortedByDescending { it.createdAt }
+            PatientSortOption.OLDEST -> filteredPatients.sortedBy { it.createdAt }
+        }
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -72,24 +116,79 @@ fun PatientListScreen(
         ) {
             Spacer(modifier = Modifier.height(18.dp))
 
-            Text(
-                text = "Data Pasien",
-                style = MaterialTheme.typography.titleLarge.copy(
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 22.sp
-                ),
+            // =========================
+            // HEADER: TITLE + SORT (POJOK KANAN)
+            // =========================
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Data Pasien",
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 22.sp
+                    ),
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Start
+                )
+
+                Box {
+                    IconButton(onClick = { sortExpanded = true }) {
+                        Icon(Icons.Default.Sort, contentDescription = "Sort")
+                    }
+
+                    DropdownMenu(
+                        expanded = sortExpanded,
+                        onDismissRequest = { sortExpanded = false }
+                    ) {
+                        PatientSortOption.entries.forEach { opt ->
+                            DropdownMenuItem(
+                                text = { Text(opt.label) },
+                                onClick = {
+                                    sortOption = opt
+                                    sortExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // =========================
+            // SEARCH (DIBAWAH JUDUL)
+            // =========================
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it.replace("\n", "") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                shape = RoundedCornerShape(14.dp),
+                label = { Text("Cari pasien...") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") }
             )
 
-            Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            if (patients.isEmpty()) {
+            Text(
+                text = "Menampilkan ${finalPatients.size} dari ${patients.size} data",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.65f)
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            if (finalPatients.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("Belum ada data pasien")
+                    Text(
+                        text = if (patients.isEmpty()) "Belum ada data pasien"
+                        else "Data tidak ditemukan"
+                    )
                 }
             } else {
                 LazyColumn(
@@ -97,12 +196,12 @@ fun PatientListScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     contentPadding = PaddingValues(bottom = 90.dp)
                 ) {
-                    items(patients, key = { it.code }) { patient ->
+                    items(finalPatients) { patient ->
                         PatientCard(
                             patient = patient,
                             onCardClick = {
                                 selectedPatient = patient
-                                showDetailDialog = true
+                                showPreviewDialog = true
                             },
                             onUpdateClick = {
                                 selectedPatient = patient
@@ -119,10 +218,8 @@ fun PatientListScreen(
         }
     }
 
-    // =========================
-    // DETAIL DIALOG (OK ONLY)
-    // =========================
-    if (showDetailDialog && selectedPatient != null) {
+    // PREVIEW (OK)
+    if (showPreviewDialog && selectedPatient != null) {
         val p = selectedPatient!!
 
         val detailText = """
@@ -140,71 +237,61 @@ fun PatientListScreen(
             title = "Detail Pasien",
             contentText = detailText,
             onDismiss = {
-                showDetailDialog = false
+                showPreviewDialog = false
                 selectedPatient = null
             }
         )
     }
 
-    // =========================
-    // UPDATE CONFIRM DIALOG
-    // =========================
+    // UPDATE CONFIRM
     if (showUpdateDialog && selectedPatient != null) {
         AlertDialog(
-            onDismissRequest = { showUpdateDialog = false },
+            onDismissRequest = {
+                showUpdateDialog = false
+                selectedPatient = null
+            },
             title = { Text("Konfirmasi Update") },
             text = { Text("Lanjutkan untuk mengupdate data ${selectedPatient!!.name}?") },
             confirmButton = {
                 Button(onClick = {
+                    val p = selectedPatient!!
                     showUpdateDialog = false
-                    onUpdate(selectedPatient!!)
-                }) {
-                    Text("Submit")
-                }
+                    selectedPatient = null
+                    onUpdate(p)
+                }) { Text("Submit") }
             },
             dismissButton = {
-                OutlinedButton(onClick = { showUpdateDialog = false }) {
-                    Text("Cancel")
-                }
+                OutlinedButton(onClick = {
+                    showUpdateDialog = false
+                    selectedPatient = null
+                }) { Text("Cancel") }
             }
         )
     }
 
-    // =========================
-    // DELETE CONFIRM DIALOG
-    // =========================
+    // DELETE CONFIRM
     if (showDeleteDialog && selectedPatient != null) {
         AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
+            onDismissRequest = {
+                showDeleteDialog = false
+                selectedPatient = null
+            },
             title = { Text("Konfirmasi Hapus") },
             text = { Text("Yakin ingin menghapus ${selectedPatient!!.name}?") },
             confirmButton = {
                 Button(onClick = {
+                    val p = selectedPatient!!
                     showDeleteDialog = false
-                    onDelete(selectedPatient!!)
-
-                    // tampil success centang
-                    successMessage = "Data pasien berhasil dihapus"
-                    showSuccessDialog = true
-                }) {
-                    Text("Hapus")
-                }
+                    selectedPatient = null
+                    onDelete(p) { _, _ -> }
+                }) { Text("Hapus") }
             },
             dismissButton = {
-                OutlinedButton(onClick = { showDeleteDialog = false }) {
-                    Text("Batal")
-                }
+                OutlinedButton(onClick = {
+                    showDeleteDialog = false
+                    selectedPatient = null
+                }) { Text("Batal") }
             }
-        )
-    }
-
-    // =========================
-    // SUCCESS DIALOG (CENTANG)
-    // =========================
-    if (showSuccessDialog) {
-        SuccessDialog(
-            message = successMessage,
-            onDismiss = { showSuccessDialog = false }
         )
     }
 }
@@ -217,7 +304,7 @@ private fun PatientCard(
     onDeleteClick: () -> Unit
 ) {
     Card(
-        onClick = onCardClick, // ✅ aman (tidak pakai Modifier.clickable)
+        onClick = onCardClick,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(

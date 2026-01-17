@@ -12,6 +12,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -21,6 +22,9 @@ fun NurseDashboardScreen(
 ) {
     var showLogoutDialog by remember { mutableStateOf(false) }
 
+    // ✅ anti spam click
+    var logoutLocked by remember { mutableStateOf(false) }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
@@ -28,11 +32,12 @@ fun NurseDashboardScreen(
                 title = {},
                 navigationIcon = {
                     TextButton(
+                        enabled = !logoutLocked,
                         onClick = { showLogoutDialog = true }
                     ) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Logout")
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Logout")
+                        Text(text = if (logoutLocked) "..." else "Logout")
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
@@ -49,7 +54,6 @@ fun NurseDashboardScreen(
                 .padding(horizontal = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-
             Spacer(modifier = Modifier.height(22.dp))
 
             Text(
@@ -59,8 +63,7 @@ fun NurseDashboardScreen(
                     fontSize = 22.sp
                 ),
                 modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onBackground
+                textAlign = TextAlign.Center
             )
 
             Spacer(modifier = Modifier.height(26.dp))
@@ -77,7 +80,6 @@ fun NurseDashboardScreen(
         }
     }
 
-    // ✅ Dialog Konfirmasi Logout
     if (showLogoutDialog) {
         AlertDialog(
             onDismissRequest = { showLogoutDialog = false },
@@ -85,9 +87,10 @@ fun NurseDashboardScreen(
             text = { Text("Apakah ingin logout?") },
             confirmButton = {
                 Button(
+                    enabled = !logoutLocked,
                     onClick = {
+                        logoutLocked = true
                         showLogoutDialog = false
-                        onLogout()
                     }
                 ) {
                     Text("OK")
@@ -95,6 +98,7 @@ fun NurseDashboardScreen(
             },
             dismissButton = {
                 OutlinedButton(
+                    enabled = !logoutLocked,
                     onClick = { showLogoutDialog = false }
                 ) {
                     Text("Cancel")
@@ -102,5 +106,14 @@ fun NurseDashboardScreen(
             },
             shape = RoundedCornerShape(18.dp)
         )
+    }
+
+    // ✅ Logout dilakukan setelah delay kecil (biar Nav selesai stabil)
+    LaunchedEffect(logoutLocked) {
+        if (logoutLocked) {
+            delay(300)
+            onLogout()
+            logoutLocked = false
+        }
     }
 }

@@ -12,6 +12,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -22,6 +23,9 @@ fun AdminDashboardScreen(
 ) {
     var showLogoutDialog by remember { mutableStateOf(false) }
 
+    // ✅ anti spam click
+    var logoutLocked by remember { mutableStateOf(false) }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
@@ -29,11 +33,12 @@ fun AdminDashboardScreen(
                 title = {},
                 navigationIcon = {
                     TextButton(
-                        onClick = { showLogoutDialog = true } // ✅ buka dialog dulu
+                        enabled = !logoutLocked,
+                        onClick = { showLogoutDialog = true }
                     ) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Logout")
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text(text = "Logout")
+                        Text(text = if (logoutLocked) "..." else "Logout")
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
@@ -59,8 +64,7 @@ fun AdminDashboardScreen(
                     fontSize = 22.sp
                 ),
                 modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onBackground
+                textAlign = TextAlign.Center
             )
 
             Spacer(modifier = Modifier.height(26.dp))
@@ -89,7 +93,6 @@ fun AdminDashboardScreen(
         }
     }
 
-    // ✅ Dialog Konfirmasi Logout
     if (showLogoutDialog) {
         AlertDialog(
             onDismissRequest = { showLogoutDialog = false },
@@ -97,9 +100,11 @@ fun AdminDashboardScreen(
             text = { Text("Apakah ingin logout?") },
             confirmButton = {
                 Button(
+                    enabled = !logoutLocked,
                     onClick = {
+                        // ✅ kunci tombol supaya tidak double navigate
+                        logoutLocked = true
                         showLogoutDialog = false
-                        onLogout()
                     }
                 ) {
                     Text("OK")
@@ -107,6 +112,7 @@ fun AdminDashboardScreen(
             },
             dismissButton = {
                 OutlinedButton(
+                    enabled = !logoutLocked,
                     onClick = { showLogoutDialog = false }
                 ) {
                     Text("Cancel")
@@ -114,5 +120,14 @@ fun AdminDashboardScreen(
             },
             shape = RoundedCornerShape(18.dp)
         )
+    }
+
+    // ✅ Logout dilakukan setelah delay kecil (biar Nav selesai stabil)
+    LaunchedEffect(logoutLocked) {
+        if (logoutLocked) {
+            delay(300)
+            onLogout()
+            logoutLocked = false
+        }
     }
 }
